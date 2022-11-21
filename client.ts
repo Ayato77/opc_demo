@@ -33,22 +33,41 @@ async function timeout(ms: number) {
 
 async function main() {
 
-    /*const mqtt = require('mqtt')
-    const mqttClient  = mqtt.connect('mqtt://test.mosquitto.org')
+    const mqtt = require('mqtt')
+    const options = {
+    //clientId:optionJSON.clientId,
+    port:1883,
+    host:'localhost',
+    //username:'wasmretrofitting',
+    //password:'wasmretrofitting',
+    //key:KEY,
+    //cert: CERT,
+    //ca: TRUSTED_CA_LIST,
+    rejectUnauthorized: false,
+    //protocolId: 'MQTT',
+    reconnectPeriod: 1000
+    }
+    const mqttClient  = mqtt.connect(options);
 
     mqttClient.on('connect', function () {
         mqttClient.subscribe('presence', function (err) {
             if (!err) {
-                mqttClient.publish('presence', 'Hello mqtt')
+                mqttClient.publish('connection', 'MQTT: Connected')
             }
         })
     })
 
+    //Listening messages from the broker
     mqttClient.on('message', function (topic, message) {
         // message is Buffer
         console.log(message.toString())
-        mqttClient.end()
-    })*/
+    })
+
+    //Display error
+    client.on('error', function(err) {
+        console.dir(err)
+    })
+
 
     try {
         // step 1 : connect to
