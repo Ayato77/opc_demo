@@ -25,7 +25,8 @@ const options = {
 };
 const client = OPCUAClient.create(options);
 // const endpointUrl = "opc.tcp://opcuademo.sterfive.com:26543";
-const endpointUrl = "opc.tcp://opcuaserver.com:48010";
+//const endpointUrl = "opc.tcp://opcuaserver.com:48010";
+const endpointUrl = "opc.tcp://192.168.0.1:4840";//address of opc server at mock factory
 
 async function timeout(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -37,14 +38,8 @@ async function main() {
     const options = {
     //clientId:optionJSON.clientId,
     port:1883,
-    host:'localhost',
-    //username:'wasmretrofitting',
-    //password:'wasmretrofitting',
-    //key:KEY,
-    //cert: CERT,
-    //ca: TRUSTED_CA_LIST,
+    host:'192.168.0.10',//Von der Lernfabrik
     rejectUnauthorized: false,
-    //protocolId: 'MQTT',
     reconnectPeriod: 1000
     }
     const mqttClient  = mqtt.connect(options);
@@ -52,7 +47,7 @@ async function main() {
     mqttClient.on('connect', function () {
         mqttClient.subscribe('presence', function (err) {
             if (!err) {
-                mqttClient.publish('connection', 'MQTT: Connected')
+                mqttClient.publish('connection', 'MQTT: Connected')//JSON Format!!
             }
         })
     })
@@ -88,7 +83,7 @@ async function main() {
 
         // step 4 : read a variable with readVariableValue
         const dataValue2 = await session.read({
-            nodeId: "ns=1;s=free_memory",
+            nodeId: 'ns=3;s="QX_MPO_LightOven_Q9"',//Ist Ofen an? semi colon aufpassen
             attributeId: AttributeIds.Value
         });
         console.log(" value = ", dataValue2.toString());
