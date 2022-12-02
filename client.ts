@@ -38,7 +38,7 @@ async function main() {
     const options = {
     //clientId:optionJSON.clientId,
     port:1883,
-    host:'192.168.0.10',//Von der Lernfabrik
+    host:'192.168.0.10',//MQTT broker at the mock factory
     rejectUnauthorized: false,
     reconnectPeriod: 1000
     }
@@ -149,6 +149,10 @@ async function main() {
         * */
         monitoredItem.on("changed", (dataValue: DataValue) => {
             console.log(" value has changed : ", dataValue.value.toString());
+            //Listen to the oven door status. When an item will enter into the oven, it stores the current time.
+            //When an item is already in the oven, it calculates the time difference and compare with the desired time.
+            //Check also if the oven is running or not.
+            //Create messages (JSON) and send them via MQTT
         });
 
         //TODO: Set subscription time to infinity
