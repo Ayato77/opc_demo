@@ -25,8 +25,17 @@ const options = {
 };
 const client = OPCUAClient.create(options);
 // const endpointUrl = "opc.tcp://opcuademo.sterfive.com:26543";
-//const endpointUrl = "opc.tcp://opcuaserver.com:48010";
-const endpointUrl = "opc.tcp://192.168.0.1:4840";//address of opc server at mock factory
+const endpointUrl = "opc.tcp://opcuaserver.com:48010";
+//const endpointUrl = "opc.tcp://192.168.0.1:4840";//address of opc server at mock factory
+
+const ACCEPTABLE_TIME_ERROR = 15000; //15 seconds. (should be fitted)
+let isItemInOven = false;
+let bakingStart;
+let bakingEnd;
+let timeLength;
+let definedBakeTime;
+let removeItem = false;
+let mqttMsg;
 
 async function timeout(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -38,7 +47,8 @@ async function main() {
     const options = {
     //clientId:optionJSON.clientId,
     port:1883,
-    host:'192.168.0.10',//MQTT broker at the mock factory
+    //host:'192.168.0.10',//MQTT broker at the mock factory
+    host:'localhost',
     rejectUnauthorized: false,
     reconnectPeriod: 1000
     }
@@ -47,7 +57,7 @@ async function main() {
     mqttClient.on('connect', function () {
         mqttClient.subscribe('presence', function (err) {
             if (!err) {
-                mqttClient.publish('connection', 'MQTT: Connected')//JSON Format!!
+                mqttClient.publish('connection', 'MQTT: Connected')
             }
         })
     })
@@ -83,19 +93,18 @@ async function main() {
 
         // step 4 : read a variable with readVariableValue
         const dataValue2 = await session.read({
-            nodeId: 'ns=3;s="QX_MPO_LightOven_Q9"',//Ist Ofen an? semi colon aufpassen
+            //nodeId: 'ns=3;s="QX_MPO_LightOven_Q9"',//Ist Ofen an? semi colon aufpassen
+            nodeId: 'ns=3;s=AirConditioner_1.Temperature',
             attributeId: AttributeIds.Value
         });
-        console.log(" value = ", dataValue2.toString());
+        console.log(" dataValue2 = ", dataValue2.toString());
 
-        // step 4' : read a variable with read
-        const maxAge = 0;
-        const nodeToRead = {
-            nodeId: 2258,
+        //Get the expected baking time length
+        /*definedBakeTime = await session.read({
+            nodeId: 'ns=3;s="PRG_MPO_Ablauf_DB"."Bake_Time"',
             attributeId: AttributeIds.Value
-        };
-        const dataValue = await session.read(nodeToRead, maxAge);
-        console.log(" value ", dataValue.toString());
+        });
+        console.log(" expectedBakeTime = ", definedBakeTime.toString());*/
 
         // step 5: install a subscription and install a monitored item for 10 seconds
         const subscription = ClientSubscription.create(session, {
@@ -121,12 +130,21 @@ async function main() {
                 console.log("terminated");
             });
 
-// install monitored item
+// set subscribed (monitored) item
 
         const itemToMonitor: ReadValueIdOptions = {
-            nodeId: "ns=1;s=free_memory",
+            nodeId: 'ns=3;s=AirConditioner_1.Temperature',
             attributeId: AttributeIds.Value
         };
+
+        /*
+        //monitor the oven's door. false: the door does not move now(??)
+        const itemToMonitor: ReadValueIdOptions = {
+            nodeId: 'ns=3;s="QX_MPO_ValveOvenDoor_Q13"',
+            attributeId: AttributeIds.Value
+        };
+        */
+
         const parameters: MonitoringParametersOptions = {
             samplingInterval: 100,
             discardOldest: true,
@@ -148,33 +166,53 @@ async function main() {
         * The receiver sends a remove command if the corresponding product is defect
         * */
         monitoredItem.on("changed", (dataValue: DataValue) => {
-            console.log(" value has changed : ", dataValue.value.toString());
+            console.log(" value has changed : ", dataValue.value.value.toString());
             //Listen to the oven door status. When an item will enter into the oven, it stores the current time.
-            //When an item is already in the oven, it calculates the time difference and compare with the desired time.
-            //Check also if the oven is running or not.
-            //Create messages (JSON) and send them via MQTT
+            //monitor the oven's door. false: the door does not move now(??)
+            if(dataValue.value.value){
+                if(!isItemInOven){
+                    //set current time. Is time given in ms?
+                    bakingStart = session.read({
+                        nodeId: 'ns=3;s="PRG_MPO_Ablauf_DB"."Oven_TON".ET',
+                        attributeId: AttributeIds.Value
+                    });
+                    isItemInOven = true;
+                }
+                else{
+                    //When an item is already in the oven, it calculates the time difference and compare with the desired time.
+                    bakingEnd = session.read({
+                        nodeId: 'ns=3;s="PRG_MPO_Ablauf_DB"."Oven_TON".ET',
+                        attributeId: AttributeIds.Value
+                    });
+                    //Check also if the oven is running or not.　How precise should be the time??
+                    timeLength = bakingEnd - bakingStart
+
+                    removeItem = (Math.abs(timeLength - definedBakeTime) > ACCEPTABLE_TIME_ERROR);
+                    //TODO:Create messages (JSON) and send them via MQTT (topic: oven status)
+                    mqttMsg = {
+                        "remove_item": removeItem, //boolean
+                        "time": timeLength // number.
+                    }
+
+                    mqttClient.publish('bake_status', JSON.stringify(mqttMsg))//JSON Format
+
+                    //oven is free now
+                    isItemInOven = false;
+                }
+            }
         });
 
-        //TODO: Set subscription time to infinity
-        await timeout(10000);
 
         //TODO: Terminate subscription only if there is an error
-        console.log("now terminating subscription");
-        await subscription.terminate();
-
-        // step 6: finding the nodeId of a node by Browse name
-        const browsePath = makeBrowsePath("RootFolder", "/Objects/Server.ServerStatus.BuildInfo.ProductName");
-
-        const result = await session.translateBrowsePath(browsePath);
-        const productNameNodeId = result.targets[0].targetId;
-        console.log(" Product Name nodeId = ", productNameNodeId.toString());
+        //console.log("now terminating subscription");
+        //await subscription.terminate();
 
         // close session
-        await session.close();
+        //await session.close();
 
         // disconnecting
-        await client.disconnect();
-        console.log("done !");
+        //await client.disconnect();
+        //console.log("done !");
     } catch(err) {
         console.log("An error has occured : ",err);
     }
