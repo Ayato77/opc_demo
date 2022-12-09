@@ -2,9 +2,10 @@
   "name": "opc_demo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "client.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node client.ts"
   },
   "keywords": [],
   "author": "",
