@@ -34,7 +34,7 @@ let bakingStart;
 let bakingEnd;
 let timeLength;
 let definedBakeTime;
-let removeItem = false;
+let bakingTimeError = false;
 let mqttMsg;
 
 async function timeout(ms: number) {
@@ -47,8 +47,8 @@ async function main() {
     const options = {
     //clientId:optionJSON.clientId,
     port:1883,
-    //host:'192.168.0.10',//MQTT broker at the mock factory
-    host:'localhost',
+    host:'192.168.0.10',//MQTT broker at the mock factory
+    //host:'localhost',
     rejectUnauthorized: false,
     reconnectPeriod: 1000
     }
@@ -187,14 +187,14 @@ async function main() {
                     //Check also if the oven is running or not.　How precise should be the time??
                     timeLength = bakingEnd - bakingStart
 
-                    removeItem = (Math.abs(timeLength - definedBakeTime) > ACCEPTABLE_TIME_ERROR);
+                    bakingTimeError = (Math.abs(timeLength - definedBakeTime) > ACCEPTABLE_TIME_ERROR);
                     //TODO:Create messages (JSON) and send them via MQTT (topic: oven status)
                     mqttMsg = {
-                        "remove_item": removeItem, //boolean
+                        "baking_time_error": bakingTimeError, //boolean
                         "time": timeLength // number.
                     }
 
-                    mqttClient.publish('bake_status', JSON.stringify(mqttMsg))//JSON Format
+                    mqttClient.publish('baking_status', JSON.stringify(mqttMsg))//JSON Format
 
                     //oven is free now
                     isItemInOven = false;
